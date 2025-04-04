@@ -1,7 +1,15 @@
 import express from "express";
 import cookieParser from "cookie-parser";
+import http from "http";
 import cors from "cors";
+import { Server } from "socket.io";
+import { SocketServerConnection } from "./utils/socketConnection.js";
+
 const app = express();
+export const server = http.createServer(app);
+const socketServer = new Server(server);
+export const socketConnection = new SocketServerConnection(socketServer);
+
 app.use(
   cors({
     origin: "http://localhost:5174",

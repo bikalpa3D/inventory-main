@@ -8,7 +8,6 @@ import mongoose from "mongoose";
 const createProduct = asyncHandler(async (req, res) => {
   const { name, category, price, stock } = req.body;
   const imagepath = req.file.path;
-  console.log(imagepath);
 
   if (!name || !category || !price || !stock) {
     throw new ApiError(400, "Please provide all fields");
@@ -25,7 +24,6 @@ const createProduct = asyncHandler(async (req, res) => {
   if (!cloudImage || !cloudImage.url) {
     throw new ApiError(500, "Image upload failed");
   }
-
   const product = await Product.create({
     name,
     category: new mongoose.Types.ObjectId(category),

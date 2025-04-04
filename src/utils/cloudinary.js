@@ -16,7 +16,7 @@ export async function uploadOnCloudinary(filepath) {
     if (!filepath) return null;
 
     const response = await cloudinary.uploader.upload(filepath, {
-      resource_type: "auto",
+      resource_type: "image",
     });
 
     fs.unlinkSync(filepath);

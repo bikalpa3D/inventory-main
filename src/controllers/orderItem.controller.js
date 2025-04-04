@@ -3,6 +3,8 @@ import { ApiResponse } from "../utils/apiResponse.js";
 import { ApiError } from "../utils/apiError.js";
 import { OrderItem } from "../models/orderItem.models.js";
 import { Product } from "../models/product.models.js";
+import { socketConnection } from "../app.js";
+import { SocketServerConnection } from "../utils/socketConnection.js";
 
 const addToOrderItem = asyncHandler(async (req, res) => {
   const { productId } = req.params;
@@ -15,6 +17,7 @@ const addToOrderItem = asyncHandler(async (req, res) => {
   }
 
   if (quantity > product.stock) {
+    SocketServerConnection.sendMessageViaSocket(req.user._id,0)
     throw new ApiError(400, "Quantity exceeds stock");
   }
   const existingOrderItems = await OrderItem.findOne({
