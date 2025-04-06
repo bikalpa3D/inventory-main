@@ -23,7 +23,7 @@ export class SocketServerConnection {
     });
   }
 
-  static sendMessageViaSocket(receiver, message) {
-    this.instance.to(userList.get(receiver)).emit("message", { message });
+  static sendMessageViaSocket(receiver, message,event="message") {
+    this.instance.to(userList.get(receiver)).emit(event, { message });
   }
 }

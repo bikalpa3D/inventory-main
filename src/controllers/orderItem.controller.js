@@ -5,6 +5,8 @@ import { OrderItem } from "../models/orderItem.models.js";
 import { Product } from "../models/product.models.js";
 import { socketConnection } from "../app.js";
 import { SocketServerConnection } from "../utils/socketConnection.js";
+import { Order } from "../models/order.models.js";
+import { khaltiPaymentVerify } from "../utils/khaltiPaymentVerify.js";
 
 const addToOrderItem = asyncHandler(async (req, res) => {
   const { productId } = req.params;
@@ -17,7 +19,7 @@ const addToOrderItem = asyncHandler(async (req, res) => {
   }
 
   if (quantity > product.stock) {
-    SocketServerConnection.sendMessageViaSocket(req.user._id,0)
+    SocketServerConnection.sendMessageViaSocket(req.user._id, 0);
     throw new ApiError(400, "Quantity exceeds stock");
   }
   const existingOrderItems = await OrderItem.findOne({
@@ -113,3 +115,92 @@ const getAllOrderItems = asyncHandler(async (req, res) => {
 });
 
 export { addToOrderItem, updateQuantity, deleteOrderItem, getAllOrderItems };
+
+export const payViaKhalti = asyncHandler(async (req, resp) => {
+  const { orderId } = req.body;
+  const user = req.user;
+
+  if (!orderId) {
+    throw new ApiError("please provide orderId");
+  }
+
+  const orderedProduct = await Order.findOne({ _id: orderId }).populate(
+    "orderItems"
+  );
+
+  if (!orderedProduct) {
+    throw new ApiError("order not found");
+  }
+
+  const calculateTotalPrice = orderedProduct.orderItems.reduce((acc, item) => {
+    return acc + item.price;
+  }, 0);
+
+  const resp = await fetch(process.env.KHALTI_END_POINT, {
+    method: "POST",
+    headers: {
+      Authorization: "Key 0c05e393ff924ec2827d3fbe33f013ad",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      return_url: process.env.KHALTI_CALLBACK_URL,
+      website_url: process.env.BACKEND_ORIGIN,
+      amount: calculateTotalPrice * 10,
+      purchase_order_id: orderedProduct._id,
+      purchase_order_name: user.username,
+      customer_info: {
+        name: user.username,
+        email: user.email,
+      },
+    }),
+  });
+  const data = await resp.json();
+  resp.status(200).json(new ApiResponse(200, data, "success"));
+});
+
+export const khaltiCallback = asyncHandler(async (req, resp) => {
+  const data = req.query;
+  const { _id } = req.user;
+  console.log(data);
+
+  const verify = await khaltiPaymentVerify(data.pidx);
+
+  if (verify.status != "Completed") {
+    throw new ApiError("failed to verify your payment");
+  }
+
+  const productOrder = await Order.findByIdAndUpdate(
+    data.purchase_order_id,
+    {
+      $set: {
+        status: "CONFIRMED",
+        isPaid: true,
+      },
+    },
+    {
+      new: true,
+    }
+  );
+  if (!productOrder) {
+    throw new ApiError("there is no any orders");
+  }
+
+  productOrder.orderItems.forEach(async (item) => {
+    const product = await Product.findById(item.product._id);
+    product.stock -= item.quantity;
+    await product.save();
+    SocketServerConnection.sendMessageViaSocket(
+      _id,
+      product.stock,
+      "remainingStock"
+    );
+  });
+
+  SocketServerConnection.sendMessageViaSocket(
+    _id,
+    "Your order has been confirmed",
+    "orderConfirmed"
+  );
+
+  resp.status(200).json(new ApiResponse("", 200, null));
+});

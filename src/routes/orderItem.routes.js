@@ -12,6 +12,7 @@ import {
   router.use(verifyJWT);
   router.route("/").get(getAllOrderItems);
   router.route("/add").post(addToOrderItem);
+  router.route("/payment").post(payViaKhalti)
   router.route("/update/:orderItemId").put(updateQuantity);
   router.route("/delete/:orderItemId").delete(deleteOrderItem);
   
